@@ -311,7 +311,7 @@ function CodeService.redeem(self: CodeService, player: Player, code: string)
 end
 
 type CodeService = typeof(CodeService) & {
-	networker: Networker.Server,
+	networker: NetworkServer,
 	codes: Codes,
 	debug: boolean,
 	dataStore: DataStore,

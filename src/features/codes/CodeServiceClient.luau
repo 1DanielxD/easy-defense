@@ -17,7 +17,7 @@ function CodeServiceClient.redeem(self: CodeServiceClient, code: string): (boole
 end
 
 type CodeServiceClient = typeof(CodeServiceClient) & {
-	networker: Networker.Client,
+	networker: NetworkClient,
 }
 
 return CodeServiceClient :: CodeServiceClient
