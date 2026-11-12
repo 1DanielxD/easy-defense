@@ -1,32 +1,42 @@
+--[[
+	Popup menus. Only one menu is open at a time; opening a menu blurs the world and narrows the FOV.
+
+	Gameplay code:  Menu.setOpenedMenu("SellMenu")  -- toggles; pass nil to close
+
+	A menu module in this folder (picked up by MenuRoot) returns a component:
+
+		return function()
+			return Menu.Component({
+				menuName = "SellMenu",
+				Title = "Sell",
+				children = { create "Frame" { ... } },
+			})
+		end
+]]
+
 local Lighting = game:GetService("Lighting")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Charm = require(ReplicatedStorage.Packages.Charm)
-local React = require(ReplicatedStorage.Packages.React)
-local ReactCharm = require(ReplicatedStorage.Packages.ReactCharm)
 local Ripple = require(ReplicatedStorage.Packages.Ripple)
-local Button = require(ReplicatedStorage.Source.Core.UI.Primitives.Button)
-local SlideOutFrame = require(ReplicatedStorage.Source.Core.UI.Primitives.SlideOutFrame)
-local TextLabel = require(ReplicatedStorage.Source.Core.UI.Primitives.TextLabel)
-local StudBackground = require(ReplicatedStorage.Source.Features.App.UI.Components.StudBackground)
+local Vide = require(ReplicatedStorage.Packages.Vide)
+local VideCharm = require(ReplicatedStorage.Packages.VideCharm)
+local UITypes = require(ReplicatedStorage.Source.Core.UI.UITypes)
 local Screen = require(ReplicatedStorage.Source.Features.App.UI.Screens.Screen)
-local e = React.createElement
+local create = Vide.create
 
 local openedMenu = Charm.atom(nil :: string?)
 local hasInitialized = false
 
-local function init()
-	if not RunService:IsRunning() then
-		return function() end
-	end
-
+-- Blur + FOV effect while any menu or screen is open.
+local function init(): () -> ()
 	if hasInitialized then
 		warn("Menu module has already been initialized!")
-		return
+		return function() end
 	end
-
 	hasInitialized = true
+
 	local blur = Instance.new("BlurEffect")
 	blur.Size = 0
 	blur.Name = "MenuBlur"
@@ -38,20 +48,17 @@ local function init()
 		camera.FieldOfView = 70 - value * 10
 	end)
 
-	local discon = Charm.subscribe(function()
+	local disconnect = Charm.subscribe(function()
 		return openedMenu() or Screen.openedScreen()
-	end, function(menuName)
-		if menuName then
-			spring:setGoal(1)
-		else
-			spring:setGoal(0)
-		end
+	end, function(name)
+		spring:setGoal(if name then 1 else 0)
 	end)
 
 	return function()
-		discon()
+		disconnect()
 		blur:Destroy()
 		spring:destroy()
+		hasInitialized = false
 	end
 end
 
@@ -63,139 +70,108 @@ local function setOpenedMenu(menuName: string?)
 	end
 end
 
+-- Vide source that is true while `menuName` is open (and no screen is covering it).
+local function useIsOpen(menuName: string): () -> boolean
+	return VideCharm.useAtom(function()
+		return openedMenu() == menuName and Screen.openedScreen() == nil
+	end)
+end
+
 type MenuProps = {
 	menuName: string,
-	children: React.ReactNode?,
 	Title: string?,
-	Prefix: any?,
 	Size: UDim2?,
-	From: UDim2?,
-	To: UDim2?,
+	OpenPosition: UDim2?,
+	ClosedPosition: UDim2?,
 	OnOpen: (() -> ())?,
 	OnClose: (() -> ())?,
+	children: UITypes.Children?,
 }
 
-local function Menu(props: MenuProps)
-	local openedScreen = ReactCharm.useAtom(Screen.openedScreen)
-	local firstTimeRef = React.useRef(true)
-	local isOpen = ReactCharm.useAtom(function()
-		return openedMenu() == props.menuName
-	end)
+local function Component(props: MenuProps)
+	local isOpen = useIsOpen(props.menuName)
+	local openPosition = props.OpenPosition or UDim2.fromScale(0.5, 0.5)
+	local closedPosition = props.ClosedPosition or UDim2.fromScale(0.5, -0.5)
 
-	React.useEffect(function()
-		if firstTimeRef.current then
-			firstTimeRef.current = false
-			return
-		end
+	local position = Vide.spring(function()
+		return if isOpen() then openPosition else closedPosition
+	end, 0.35, 0.8)
 
-		if isOpen and props.OnOpen then
-			props.OnOpen()
-		elseif not isOpen and props.OnClose then
-			props.OnClose()
-		end
-	end, { isOpen })
+	if props.OnOpen or props.OnClose then
+		-- Charm.subscribe only fires on changes (not on mount, and not twice under Vide strict mode).
+		Vide.cleanup(Charm.subscribe(function()
+			return openedMenu() == props.menuName and Screen.openedScreen() == nil
+		end, function(open: boolean)
+			if open and props.OnOpen then
+				props.OnOpen()
+			elseif not open and props.OnClose then
+				props.OnClose()
+			end
+		end))
+	end
 
-	return e(SlideOutFrame, {
-		Shown = isOpen and openedScreen == nil,
-		From = props.From or UDim2.fromScale(0.5, 0.5),
-		To = props.To or UDim2.fromScale(0.5, -0.5),
-		AnchorPoint = Vector2.new(0.5, 0.5),
+	return create "Frame" {
+		Name = props.menuName,
 		Size = props.Size or UDim2.fromOffset(600, 400),
+		Position = position,
+		AnchorPoint = Vector2.new(0.5, 0.5),
 		BackgroundColor3 = Color3.fromRGB(20, 20, 20),
 		BackgroundTransparency = 0.5,
-	}, {
-		Stroke = e("UIStroke", {
-			Thickness = 3,
-			Color = Color3.fromRGB(20, 20, 20),
-		}),
 
-		Content = e("Frame", {
-			Size = UDim2.new(1, 0, 1, -50),
-			Position = UDim2.fromScale(0, 1),
-			AnchorPoint = Vector2.new(0, 1),
+		create "UIStroke" { Thickness = 3, Color = Color3.fromRGB(20, 20, 20) },
+
+		create "TextLabel" {
+			Name = "Title",
+			Text = props.Title or props.menuName,
+			Size = UDim2.new(1, -60, 0, 50),
+			Position = UDim2.fromOffset(10, 0),
 			BackgroundTransparency = 1,
-		}, props.children),
+			TextScaled = true,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			FontFace = Font.fromEnum(Enum.Font.BuilderSansExtraBold),
+			TextColor3 = Color3.new(1, 1, 1),
 
-		TopBar = e(StudBackground, {
-			Size = UDim2.new(1, 0, 0, 50),
-			Position = UDim2.fromScale(0, 0),
-			ImageColor3 = Color3.fromRGB(255, 255, 255),
-			BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-		}, {
-			Title = e(TextLabel, {
-				Text = props.Title,
-				Size = UDim2.fromScale(0.8, 0.8),
-				AnchorPoint = Vector2.new(0, 0.5),
-				Position = UDim2.fromScale(0.01, 0.5),
-				Stroke = { Thickness = 3, Color = Color3.fromRGB(20, 20, 20) },
-				TextXAlignment = Enum.TextXAlignment.Left,
-				Prefix = props.Prefix,
-			}),
+			create "UIStroke" { Thickness = 3, Color = Color3.fromRGB(20, 20, 20) },
+		},
 
-			Stroke = e("UIStroke", {
-				Thickness = 3,
-				Color = Color3.fromRGB(20, 20, 20),
-			}),
-
-			Gradient = e("UIGradient", {
-				Rotation = 90,
-				Color = ColorSequence.new({
-					ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
-					ColorSequenceKeypoint.new(0.21, Color3.fromRGB(71, 230, 255)),
-					ColorSequenceKeypoint.new(0.87, Color3.fromRGB(10, 143, 255)),
-					ColorSequenceKeypoint.new(1, Color3.fromRGB(4, 68, 117)),
-				}),
-			}),
-		}),
-
-		X = e(Button, {
-			hoverScale = 1,
+		create "TextButton" {
+			Name = "Close",
+			Text = "X",
 			Size = UDim2.fromOffset(50, 50),
 			Position = UDim2.fromScale(1, 0),
 			AnchorPoint = Vector2.new(1, 0),
-			BackgroundTransparency = 1,
+			BackgroundColor3 = Color3.fromRGB(255, 10, 10),
+			TextScaled = true,
+			FontFace = Font.fromEnum(Enum.Font.BuilderSansExtraBold),
+			TextColor3 = Color3.new(1, 1, 1),
 			ZIndex = 2,
+
 			Activated = function()
 				if openedMenu() == props.menuName then
 					openedMenu(nil)
 				end
 			end,
-		}, {
-			Text = e(TextLabel, {
-				Text = "X",
-				Size = UDim2.fromScale(0.85, 0.85),
-				AnchorPoint = Vector2.new(0.5, 0.5),
-				Position = UDim2.fromScale(0.5, 0.5),
-				Stroke = { Thickness = 3, Color = Color3.fromRGB(117, 4, 4) },
-			}),
 
-			Bg = e(StudBackground, {
-				Size = UDim2.new(1, 0, 0, 50),
-				Position = UDim2.fromScale(0, 0),
-				ImageColor3 = Color3.fromRGB(255, 255, 255),
-				BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-			}, {
+			create "UIStroke" {
+				Thickness = 3,
+				Color = Color3.fromRGB(117, 4, 4),
+				ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+			},
+		},
 
-				Stroke = e("UIStroke", {
-					Thickness = 3,
-					Color = Color3.fromRGB(20, 20, 20),
-				}),
+		create "Frame" {
+			Name = "Content",
+			Size = UDim2.new(1, 0, 1, -50),
+			Position = UDim2.fromScale(0, 1),
+			AnchorPoint = Vector2.new(0, 1),
+			BackgroundTransparency = 1,
 
-				Gradient = e("UIGradient", {
-					Rotation = 90,
-					Color = ColorSequence.new({
-						ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
-						ColorSequenceKeypoint.new(0.15, Color3.fromRGB(255, 71, 71)),
-						ColorSequenceKeypoint.new(0.87, Color3.fromRGB(255, 10, 10)),
-						ColorSequenceKeypoint.new(1, Color3.fromRGB(117, 4, 4)),
-					}),
-				}),
-			}),
-		}),
-	})
+			props.children,
+		},
+	}
 end
 
-if RunService:IsRunning() then
+if RunService:IsRunning() and RunService:IsClient() then
 	init()
 end
 
@@ -203,5 +179,6 @@ return {
 	init = init,
 	openedMenu = openedMenu,
 	setOpenedMenu = setOpenedMenu,
-	Component = Menu,
+	useIsOpen = useIsOpen,
+	Component = Component,
 }

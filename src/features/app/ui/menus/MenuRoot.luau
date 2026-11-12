@@ -1,23 +1,25 @@
+-- Mounts every menu module in this folder (each returns a Vide component; see Menu.luau).
+
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local React = require(ReplicatedStorage.Packages.React)
-local Sift = require(ReplicatedStorage.Packages.Sift)
-local e = React.createElement
+local Vide = require(ReplicatedStorage.Packages.Vide)
+local create = Vide.create
 
-local capturedMenus = {}
+local capturedMenus: { [string]: () -> any } = {}
 for _, module in script.Parent:GetChildren() do
 	if module:IsA("ModuleScript") and module.Name ~= "Menu" and module ~= script then
-		capturedMenus[module.Name] = require(module)
+		capturedMenus[module.Name] = require(module) :: any
 	end
 end
 
 return function()
-	return e(
-		React.Fragment,
-		nil,
-		Sift.Dictionary.map(capturedMenus, function(menuModule, name)
-			return e(menuModule), name
-		end),
-		{}
-	)
+	local children = {}
+	for _, menu in capturedMenus do
+		table.insert(children, menu())
+	end
+
+	return create "Folder" {
+		Name = "Menus",
+		children,
+	}
 end

@@ -1,15 +1,14 @@
+-- Always-visible HUD (currency, side buttons, ...). Add HUD component modules next to this file
+-- and list them below.
+
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local BottomBar = require(script.Parent.BottomBar)
-local LeftSideBar = require(script.Parent.LeftSideBar)
-local TopBar = require(script.Parent.TopBar)
-local React = require(ReplicatedStorage.Packages.React)
-local e = React.createElement
+local Vide = require(ReplicatedStorage.Packages.Vide)
+local create = Vide.create
 
 return function()
-	return e(React.Fragment, nil, {
-		BottomBar = e(BottomBar),
-		LeftSideBar = e(LeftSideBar),
-		TopBar = e(TopBar),
-	})
+	return create "Folder" {
+		Name = "Hud",
+		-- BottomBar(),
+	}
 end

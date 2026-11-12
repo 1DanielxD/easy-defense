@@ -1,23 +1,25 @@
+-- Mounts every screen module in this folder (each returns a Vide component; see Screen.luau).
+
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local React = require(ReplicatedStorage.Packages.React)
-local Sift = require(ReplicatedStorage.Packages.Sift)
-local e = React.createElement
+local Vide = require(ReplicatedStorage.Packages.Vide)
+local create = Vide.create
 
-local capturedScreens = {}
+local capturedScreens: { [string]: () -> any } = {}
 for _, module in script.Parent:GetChildren() do
 	if module:IsA("ModuleScript") and module.Name ~= "Screen" and module ~= script then
-		capturedScreens[module.Name] = require(module)
+		capturedScreens[module.Name] = require(module) :: any
 	end
 end
 
 return function()
-	return e(
-		React.Fragment,
-		nil,
-		Sift.Dictionary.map(capturedScreens, function(screenModule, name)
-			return e(screenModule), name
-		end),
-		{}
-	)
+	local children = {}
+	for _, screen in capturedScreens do
+		table.insert(children, screen())
+	end
+
+	return create "Folder" {
+		Name = "Screens",
+		children,
+	}
 end

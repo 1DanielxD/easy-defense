@@ -1,35 +1,34 @@
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
+-- Shared Vide prop types.
+-- Any prop typed `Derivable<T>` accepts either a plain value or a source/derived getter;
+-- Vide binds getters reactively when they're passed as instance properties.
 
-local React = require(ReplicatedStorage.Packages.React)
+export type Derivable<T> = T | () -> T
 
-export type CanBeBinding<T> = T | React.Binding<T>
-export type Children = React.ReactNode | { React.ReactNode } | any
+-- Anything Vide accepts as a child: an Instance, an array of them, or a source returning them.
+export type Children = { any } | Instance | () -> any
 
 export type GenericUIProps = {
-	Active: CanBeBinding<boolean>?,
-	BackgroundTransparency: CanBeBinding<number>?,
-	Size: CanBeBinding<UDim2>?,
-	Position: CanBeBinding<UDim2>?,
-	AnchorPoint: CanBeBinding<Vector2>?,
-	ScaleType: CanBeBinding<Enum.ScaleType>?,
-	BackgroundColor3: CanBeBinding<Color3>?,
-	ClipsDescendants: CanBeBinding<boolean>?,
-	LayoutOrder: CanBeBinding<number>?,
-	ZIndex: CanBeBinding<number>?,
-	Visible: CanBeBinding<boolean>?,
-	Rotation: CanBeBinding<number>?,
-	SizeConstraint: CanBeBinding<Enum.SizeConstraint>?,
-	AutomaticSize: CanBeBinding<Enum.AutomaticSize>?,
+	Active: Derivable<boolean>?,
+	BackgroundTransparency: Derivable<number>?,
+	Size: Derivable<UDim2>?,
+	Position: Derivable<UDim2>?,
+	AnchorPoint: Derivable<Vector2>?,
+	BackgroundColor3: Derivable<Color3>?,
+	ClipsDescendants: Derivable<boolean>?,
+	LayoutOrder: Derivable<number>?,
+	ZIndex: Derivable<number>?,
+	Visible: Derivable<boolean>?,
+	Rotation: Derivable<number>?,
+	SizeConstraint: Derivable<Enum.SizeConstraint>?,
+	AutomaticSize: Derivable<Enum.AutomaticSize>?,
 }
 
-export type ImageLabelProps = GenericUIProps & {
-	Image: CanBeBinding<string>?,
-	ImageColor3: CanBeBinding<Color3>?,
-	ImageTransparency: CanBeBinding<number>?,
-	ImageRectOffset: CanBeBinding<Vector2>?,
-	ImageRectSize: CanBeBinding<Vector2>?,
-	SliceCenter: CanBeBinding<Rect>?,
-	TileSize: CanBeBinding<UDim2>?,
+export type TextProps = {
+	Text: Derivable<string>?,
+	TextColor3: Derivable<Color3>?,
+	Stroke: { Thickness: number?, Color: Color3? }?,
+	Gradient: { Rotation: number?, Color: ColorSequence? }?,
+	Prefix: { Image: string }?,
 }
 
 return nil

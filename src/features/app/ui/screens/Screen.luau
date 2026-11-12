@@ -1,10 +1,26 @@
+--[[
+	Full-screen takeovers (reward reveals, cutscenes...). Only one screen is open at a time,
+	and while one is open, menus are hidden.
+
+	Gameplay code:  Screen.setOpenedScreen("RebirthReward") / Screen.setOpenedScreen(nil)
+
+	A screen module in this folder (picked up by ScreenRoot) returns a component:
+
+		return function()
+			return Screen.Component({
+				screenName = "RebirthReward",
+				children = { create "Frame" { ... } },
+			})
+		end
+]]
+
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Charm = require(ReplicatedStorage.Packages.Charm)
-local React = require(ReplicatedStorage.Packages.React)
-local ReactCharm = require(ReplicatedStorage.Packages.ReactCharm)
-local useSpring = require(ReplicatedStorage.Source.Core.UI.Hooks.useSpring)
-local e = React.createElement
+local Vide = require(ReplicatedStorage.Packages.Vide)
+local VideCharm = require(ReplicatedStorage.Packages.VideCharm)
+local UITypes = require(ReplicatedStorage.Source.Core.UI.UITypes)
+local create = Vide.create
 
 local openedScreen = Charm.atom(nil :: string?)
 
@@ -12,43 +28,34 @@ local function setOpenedScreen(screenName: string?)
 	openedScreen(screenName)
 end
 
-type ScreenProps = {
-	screenName: string,
-	children: React.ReactNode?,
-}
-
-local function Screen(props: ScreenProps)
-	local isOpen = ReactCharm.useAtom(function()
-		return openedScreen() == props.screenName
+-- Vide source that is true while `screenName` is the open screen.
+local function useIsOpen(screenName: string): () -> boolean
+	return VideCharm.useAtom(function()
+		return openedScreen() == screenName
 	end)
-
-	if isOpen then
-		return nil
-	end
-
-	return e(React.Fragment, nil, props.children)
 end
 
-local function useScreenSpring(screenName: string)
-	local binding, spring =
-		useSpring(if openedScreen() == screenName then 1 else 0, { frequency = 3, dampingRatio = 0.7 })
+type ScreenProps = {
+	screenName: string,
+	children: UITypes.Children?,
+}
 
-	React.useEffect(function()
-		return Charm.subscribe(openedScreen, function(newScreen)
-			if newScreen == screenName then
-				spring:setGoal(1)
-			else
-				spring:setGoal(0)
-			end
-		end)
-	end, {})
+local function Component(props: ScreenProps)
+	local isOpen = useIsOpen(props.screenName)
 
-	return binding
+	return create "Frame" {
+		Name = props.screenName,
+		Size = UDim2.fromScale(1, 1),
+		BackgroundTransparency = 1,
+		Visible = isOpen,
+
+		props.children,
+	}
 end
 
 return {
 	openedScreen = openedScreen,
 	setOpenedScreen = setOpenedScreen,
-	Component = Screen,
-	useScreenSpring = useScreenSpring,
+	useIsOpen = useIsOpen,
+	Component = Component,
 }

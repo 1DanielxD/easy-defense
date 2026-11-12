@@ -1,42 +1,25 @@
+--[[
+	Turns a DataServiceTyped Value into a Vide source that updates whenever the value
+	(or anything nested under it) changes. Must be called inside a Vide scope (a component);
+	the subscription is cleaned up with that scope.
+
+	local PlayerData = require(ReplicatedStorage.Source.Game.Data).client
+	local currency = useDataState(PlayerData.currency)
+	create "TextLabel" { Text = function() return FormatCurrency(currency()) end }
+]]
+
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local DataService = require(ReplicatedStorage.Packages.DataService).client
-local React = require(ReplicatedStorage.Packages.React)
+local Vide = require(ReplicatedStorage.Packages.Vide)
 
-return function(path: string | { string }, defered: boolean?)
-	local key = if type(path) == "string" then path else table.concat(path, ".")
-	local value, setValue = React.useState(DataService:get(path))
+type DataValue<T> = (() -> T) & { Changed: ((T) -> ()) -> () -> () }
 
-	React.useEffect(function()
-		local mostRecent = nil
-		local thread = nil
-		local function update(new: any)
-			if not defered then
-				setValue(if type(new) == "table" then table.clone(new) else new)
-				return
-			end
+return function<T>(value: DataValue<T>): () -> T
+	local state = Vide.source(value())
 
-			mostRecent = new
-			if thread then
-				return
-			end
+	Vide.cleanup(value.Changed(function(new: T)
+		state(new)
+	end))
 
-			thread = task.defer(function()
-				setValue(if type(mostRecent) == "table" then table.clone(mostRecent) else mostRecent)
-				mostRecent = nil
-				thread = nil
-			end)
-		end
-
-		local conn = DataService:getChangedSignal(path):Connect(update)
-
-		return function()
-			conn:Disconnect()
-			if thread then
-				task.cancel(thread)
-			end
-		end
-	end, { key })
-
-	return value
+	return state
 end

@@ -53,7 +53,49 @@ export type ConveyorBoughtCrate = {
 	mutations: Mutations?,
 }
 
-return {
+export type TowerIndex = { [string]: boolean? }
+
+export type PlayerData = {
+	currency: number,
+	rebirths: number,
+	conveyorLevel: number,
+	instaOpenCrates: InstaOpenCrates,
+	conveyorBoughtCrates: { [number]: ConveyorBoughtCrate },
+	towerIndex: {
+		normal: TowerIndex,
+		gold: TowerIndex,
+		diamond: TowerIndex,
+	},
+	plotNodes: OccupiedNodes,
+	inventory: { [string]: ItemData },
+	hotbar: { string },
+	tutorial: {
+		step: string,
+		completed: boolean,
+	},
+	stats: {
+		crateRolls: number,
+		cratesOpened: number,
+		enemiesKilled: number,
+		totalCurrency: number,
+		timePlayed: number,
+		robuxSpent: number,
+	},
+	settings: {
+		music: boolean,
+	},
+
+	-- Keys created at runtime (not reconciled from the template)
+	sessionStart: number?,
+	groupLootClaimed: boolean?,
+	_codes: { [string]: boolean }?,
+	__gamepasses: { [string]: boolean? }?,
+	__oneTimePurchases: { [string]: boolean }?,
+	__purchaseCooldowns: { [string]: number }?,
+	__giftReceiver: number?,
+}
+
+local template: PlayerData = {
 	currency = 100,
 	rebirths = 0,
 	conveyorLevel = 1,
@@ -83,3 +125,5 @@ return {
 		music = true,
 	},
 }
+
+return template
